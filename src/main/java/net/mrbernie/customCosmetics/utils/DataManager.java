@@ -100,6 +100,68 @@ public class DataManager {
         savePlayerConfig(creatorUUID, config);
     }
 
+    public void deleteCosmetic(UUID playerUUID, String cosmeticId) {
+        FileConfiguration config = getPlayerConfig(playerUUID);
+        String path = "cosmetics." + cosmeticId;
+        config.set(path, null);
+        savePlayerConfig(playerUUID, config);
+    }
+
+    public int cleanupInvalidCosmetics(UUID playerUUID) {
+        FileConfiguration config = getPlayerConfig(playerUUID);
+        ConfigurationSection cosmeticsSection = config.getConfigurationSection("cosmetics");
+        if (cosmeticsSection == null) {
+            return 0;
+        }
+
+        int cleaned = 0;
+        List<String> toRemove = new ArrayList<>();
+        List<String> equippedToRemove = new ArrayList<>();
+        List<String> currentEquipped = getEquippedCosmetics(playerUUID);
+
+        for (String id : cosmeticsSection.getKeys(false)) {
+            String path = "cosmetics." + id;
+            String name = config.getString(path + ".name");
+            String typeStr = config.getString(path + ".type");
+            List<String> blockDataList = config.getStringList(path + ".blocks");
+
+            // Mark for removal if:
+            // 1. No name or type
+            // 2. No blocks or empty blocks list
+            // 3. Invalid type
+            if (name == null || name.isEmpty() || 
+                typeStr == null || typeStr.isEmpty() ||
+                blockDataList == null || blockDataList.isEmpty() ||
+                CosmeticType.fromString(typeStr) == null) {
+                toRemove.add(id);
+                cleaned++;
+                
+                // If this invalid cosmetic is equipped, mark it for unequipping
+                if (currentEquipped.contains(id)) {
+                    equippedToRemove.add(id);
+                }
+            }
+        }
+
+        // Remove invalid cosmetics
+        for (String id : toRemove) {
+            config.set("cosmetics." + id, null);
+            plugin.getLogger().info("Cleaned up invalid cosmetic: " + id + " for player " + playerUUID);
+        }
+        
+        // Unequip invalid cosmetics
+        if (!equippedToRemove.isEmpty()) {
+            currentEquipped.removeAll(equippedToRemove);
+            config.set("equipped", currentEquipped);
+        }
+
+        if (cleaned > 0) {
+            savePlayerConfig(playerUUID, config);
+        }
+
+        return cleaned;
+    }
+
     public Map<String, Cosmetic> loadAllCosmeticDefinitions() {
         Map<String, Cosmetic> definitions = new HashMap<>();
 

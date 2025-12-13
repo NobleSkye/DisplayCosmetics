@@ -1,14 +1,14 @@
 name: CustomCosmetics
 version: 1.1.0
 main: net.mrbernie.customCosmetics.CustomCosmetics
-api-version: '1.21.4'
+api-version: '1.21.8'
 authors: [MrBernie6873, NobleSkye]
 description: Create and wear your own custom block cosmetics!
 softdepend: [ProtocolLib]
 commands:
   cc:
     description: Main command for CustomCosmetics plugin.
-    usage: /cc <create|accept|inv|list|reload|toggle>
+    usage: /cc <create|accept|inv|equip|delete|reload|toggle>
     aliases: [cosmetics, cosmetic]
 permissions:
   customcosmetics.*:
@@ -17,17 +17,21 @@ permissions:
     children:
       customcosmetics.create: true
       customcosmetics.inv: true
-      customcosmetics.list: true
+      customcosmetics.equip: true
+      customcosmetics.delete: true
       customcosmetics.admin: true
       customcosmetics.limit.bypass: true
   customcosmetics.create:
     description: Allows a player to create their own cosmetics.
     default: true
   customcosmetics.inv:
-    description: Allows a player to open the cosmetic inventory and wear items.
-    default: true
-  customcosmetics.list:
     description: Allows a player to browse their cosmetics by category.
+    default: true
+  customcosmetics.equip:
+    description: Allows a player to open the equipment inventory and wear items.
+    default: true
+  customcosmetics.delete:
+    description: Allows a player to delete their own cosmetics.
     default: true
   customcosmetics.admin:
     description: Gives access to administrative commands for the plugin.

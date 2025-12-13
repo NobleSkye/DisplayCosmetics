@@ -90,7 +90,7 @@ public class GUIListener implements Listener {
                 return;
             }
 
-            // Cosmetic item clicked - equip it
+            // Cosmetic item clicked - equip or delete
             if (clickedItem.getType() == Material.IRON_HELMET || 
                 clickedItem.getType() == Material.IRON_CHESTPLATE) {
                 
@@ -106,9 +106,41 @@ public class GUIListener implements Listener {
                         .orElse(null);
 
                 if (cosmetic != null) {
-                    plugin.getCosmeticManager().equipCosmetic(player, cosmetic.id());
-                    player.sendMessage(ChatColor.GREEN + "Equipped " + cosmeticName + "!");
-                    player.closeInventory();
+                    // Shift-right-click to delete
+                    if (event.isShiftClick() && event.isRightClick()) {
+                        plugin.getDataManager().deleteCosmetic(player.getUniqueId(), cosmetic.id());
+                        plugin.getCosmeticManager().unequipCosmetic(player, cosmetic.id());
+                        plugin.getCosmeticManager().loadCosmetics();
+                        player.sendMessage(ChatColor.RED + "Deleted cosmetic: " + cosmeticName);
+                        
+                        // Refresh the page
+                        CosmeticType type = viewingType.get(player.getUniqueId());
+                        int page = currentPage.getOrDefault(player.getUniqueId(), 0);
+                        plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page);
+                    } else if (event.isRightClick()) {
+                        // Right-click to unequip (if equipped)
+                        if (plugin.getCosmeticManager().isEquipped(player, cosmetic.id())) {
+                            plugin.getCosmeticManager().unequipCosmetic(player, cosmetic.id());
+                            player.sendMessage(ChatColor.YELLOW + "Unequipped " + cosmeticName + "!");
+                            
+                            // Refresh the page
+                            CosmeticType type = viewingType.get(player.getUniqueId());
+                            int page = currentPage.getOrDefault(player.getUniqueId(), 0);
+                            plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page);
+                        } else {
+                            player.sendMessage(ChatColor.RED + "This cosmetic is not equipped!");
+                        }
+                    } else {
+                        // Left-click to equip
+                        if (plugin.getCosmeticManager().equipCosmetic(player, cosmetic.id())) {
+                            player.sendMessage(ChatColor.GREEN + "Equipped " + cosmeticName + "!");
+                            
+                            // Refresh the page
+                            CosmeticType type = viewingType.get(player.getUniqueId());
+                            int page = currentPage.getOrDefault(player.getUniqueId(), 0);
+                            plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page);
+                        }
+                    }
                 }
             }
             return;

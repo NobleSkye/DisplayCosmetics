@@ -31,17 +31,21 @@ public class ServerSideCosmeticDisplay {
 
     public void spawn() {
         Location headLoc = getHeadLocation();
+        float yaw = headLoc.getYaw();
         
         for (Map.Entry<Vector, BlockData> entry : cosmetic.blocks().entrySet()) {
             Vector offset = entry.getKey();
             BlockData blockData = entry.getValue();
             
-            // Calculate display position
+            // Calculate display position with rotation
             float offsetX = (float) offset.getX() * PIXEL_SCALE;
             float offsetY = (float) offset.getY() * PIXEL_SCALE;
             float offsetZ = (float) offset.getZ() * PIXEL_SCALE;
             
-            Location displayLoc = headLoc.clone().add(offsetX, offsetY, offsetZ);
+            // Rotate the offset vector so all blocks spawn in correct orientation
+            Vector rotatedOffset = rotateAroundY(new Vector(offsetX, offsetY, offsetZ), yaw);
+            
+            Location displayLoc = headLoc.clone().add(rotatedOffset);
             
             BlockDisplay display = headLoc.getWorld().spawn(displayLoc, BlockDisplay.class, entity -> {
                 entity.setBlock(blockData);
@@ -67,6 +71,7 @@ public class ServerSideCosmeticDisplay {
         }
         
         Location headLoc = getHeadLocation();
+        float yaw = headLoc.getYaw();
         int index = 0;
         
         for (Map.Entry<Vector, BlockData> entry : cosmetic.blocks().entrySet()) {
@@ -78,15 +83,30 @@ public class ServerSideCosmeticDisplay {
             }
             
             Vector offset = entry.getKey();
+            // Scale the offset to pixel size
             float offsetX = (float) offset.getX() * PIXEL_SCALE;
             float offsetY = (float) offset.getY() * PIXEL_SCALE;
             float offsetZ = (float) offset.getZ() * PIXEL_SCALE;
             
-            Location newLoc = headLoc.clone().add(offsetX, offsetY, offsetZ);
+            // Rotate the offset vector based on player's yaw so all blocks rotate together
+            Vector rotatedOffset = rotateAroundY(new Vector(offsetX, offsetY, offsetZ), yaw);
+            
+            Location newLoc = headLoc.clone().add(rotatedOffset);
             display.teleport(newLoc);
             
             index++;
         }
+    }
+    
+    private Vector rotateAroundY(Vector vec, float yaw) {
+        double angle = Math.toRadians(yaw); // Minecraft yaw increases clockwise (right)
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        
+        double newX = vec.getX() * cos - vec.getZ() * sin;
+        double newZ = vec.getX() * sin + vec.getZ() * cos;
+        
+        return new Vector(newX, vec.getY(), newZ);
     }
 
     public void destroy() {
@@ -131,12 +151,20 @@ public class ServerSideCosmeticDisplay {
     }
 
     private Location getHeadLocation() {
-        Location loc = owner.getLocation().clone();
+        Location loc;
+        
+        // HEAD uses eye location (head yaw), BACK and SHOULDER use body location (body yaw)
+        if (cosmetic.type() == CosmeticType.HEAD) {
+            loc = owner.getEyeLocation().clone();
+        } else {
+            loc = owner.getLocation().clone();
+        }
+        
         loc.setPitch(0); // Remove pitch so cosmetics don't tilt
         
         switch (cosmetic.type()) {
             case HEAD:
-                loc.add(0, owner.getEyeHeight() + 0.25, 0);
+                loc.add(0, 0.25, 0);
                 break;
             case BACK:
                 loc.add(0, owner.getEyeHeight() - 0.5, 0);

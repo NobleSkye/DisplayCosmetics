@@ -21,7 +21,7 @@ public class CosmeticManager {
     private final CustomCosmetics plugin;
     private final VisibilityManager visibilityManager;
     private final Map<String, Cosmetic> registeredCosmetics = new HashMap<>();
-    private final Map<UUID, Map<String, ServerSideCosmeticDisplay>> activeCosmetics = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, PacketCosmeticDisplay>> activeCosmetics = new ConcurrentHashMap<>();
     private final Map<UUID, List<String>> equippedCosmetics = new HashMap<>();
 
     private static final float PIXEL_SCALE = 0.0625f;
@@ -29,7 +29,7 @@ public class CosmeticManager {
     public CosmeticManager(CustomCosmetics plugin) {
         this.plugin = plugin;
         this.visibilityManager = plugin.getVisibilityManager();
-        plugin.getLogger().info("Using server-side entity rendering for cosmetics.");
+        plugin.getLogger().info("Using packet-based rendering for cosmetics.");
     }
 
     public void loadPlayerData(Player player) {
@@ -126,7 +126,7 @@ public class CosmeticManager {
             return;
         }
         
-        ServerSideCosmeticDisplay display = new ServerSideCosmeticDisplay(plugin, player, cosmetic);
+        PacketCosmeticDisplay display = new PacketCosmeticDisplay(plugin, player, cosmetic);
         display.spawn();
         
         activeCosmetics.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>()).put(cosmeticId, display);
@@ -148,7 +148,7 @@ public class CosmeticManager {
     private void despawnCosmetic(Player player, String cosmeticId) {
         UUID playerUUID = player.getUniqueId();
         if (activeCosmetics.containsKey(playerUUID)) {
-            Map<String, ServerSideCosmeticDisplay> playerActiveCosmetics = activeCosmetics.get(playerUUID);
+            Map<String, PacketCosmeticDisplay> playerActiveCosmetics = activeCosmetics.get(playerUUID);
             if (playerActiveCosmetics.containsKey(cosmeticId)) {
                 playerActiveCosmetics.get(cosmeticId).destroy();
                 playerActiveCosmetics.remove(cosmeticId);
@@ -156,9 +156,34 @@ public class CosmeticManager {
         }
     }
 
-    public void equipCosmetic(Player player, String cosmeticId) {
+    public boolean equipCosmetic(Player player, String cosmeticId) {
+        Cosmetic cosmetic = registeredCosmetics.get(cosmeticId);
+        if (cosmetic == null) {
+            return false;
+        }
+        
+        // Check if already equipped
+        if (isEquipped(player, cosmeticId)) {
+            player.sendMessage(ChatColor.RED + "This cosmetic is already equipped!");
+            return false;
+        }
+        
+        // Count how many of this type are already equipped
+        List<String> equipped = equippedCosmetics.getOrDefault(player.getUniqueId(), new ArrayList<>());
+        long typeCount = equipped.stream()
+            .map(registeredCosmetics::get)
+            .filter(Objects::nonNull)
+            .filter(c -> c.type() == cosmetic.type())
+            .count();
+        
+        if (typeCount >= 2) {
+            player.sendMessage(ChatColor.RED + "You can only equip 2 " + cosmetic.type().name() + " cosmetics at once!");
+            return false;
+        }
+        
         equippedCosmetics.computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>()).add(cosmeticId);
         spawnCosmetic(player, cosmeticId);
+        return true;
     }
 
     public void unequipCosmetic(Player player, String cosmeticId) {
@@ -207,12 +232,12 @@ public class CosmeticManager {
                 for (UUID uuid : new ArrayList<>(activeCosmetics.keySet())) {
                     Player player = Bukkit.getPlayer(uuid);
                     if (player == null || !player.isOnline()) {
-                        activeCosmetics.get(uuid).values().forEach(ServerSideCosmeticDisplay::destroy);
+                        activeCosmetics.get(uuid).values().forEach(PacketCosmeticDisplay::destroy);
                         activeCosmetics.remove(uuid);
                         equippedCosmetics.remove(uuid);
                         continue;
                     }
-                    Map<String, ServerSideCosmeticDisplay> playerCosmetics = activeCosmetics.get(uuid);
+                    Map<String, PacketCosmeticDisplay> playerCosmetics = activeCosmetics.get(uuid);
                     if (playerCosmetics == null) continue;
                     
                     playerCosmetics.forEach((cosmeticId, display) -> {
@@ -226,8 +251,8 @@ public class CosmeticManager {
     public void refreshVisibilityForPlayer(Player player) {
         // Update visibility for player's own cosmetics
         if (activeCosmetics.containsKey(player.getUniqueId())) {
-            Map<String, ServerSideCosmeticDisplay> ownDisplays = activeCosmetics.get(player.getUniqueId());
-            for (ServerSideCosmeticDisplay display : ownDisplays.values()) {
+            Map<String, PacketCosmeticDisplay> ownDisplays = activeCosmetics.get(player.getUniqueId());
+            for (PacketCosmeticDisplay display : ownDisplays.values()) {
                 if (visibilityManager.canSeeSelf(player)) {
                     display.showTo(player);
                 } else {
@@ -241,8 +266,8 @@ public class CosmeticManager {
             if (other.equals(player)) continue;
             
             if (activeCosmetics.containsKey(other.getUniqueId())) {
-                Map<String, ServerSideCosmeticDisplay> otherDisplays = activeCosmetics.get(other.getUniqueId());
-                for (ServerSideCosmeticDisplay display : otherDisplays.values()) {
+                Map<String, PacketCosmeticDisplay> otherDisplays = activeCosmetics.get(other.getUniqueId());
+                for (PacketCosmeticDisplay display : otherDisplays.values()) {
                     if (visibilityManager.canSeeOthers(player)) {
                         display.showTo(player);
                     } else {
@@ -288,5 +313,9 @@ public class CosmeticManager {
 
     public List<String> getEquippedCosmetics(Player player) {
         return equippedCosmetics.getOrDefault(player.getUniqueId(), new ArrayList<>());
+    }
+    
+    public boolean isEquipped(Player player, String cosmeticId) {
+        return equippedCosmetics.getOrDefault(player.getUniqueId(), new ArrayList<>()).contains(cosmeticId);
     }
 }

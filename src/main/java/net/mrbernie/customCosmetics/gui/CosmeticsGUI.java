@@ -7,14 +7,17 @@ import net.mrbernie.customCosmetics.utils.DataManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Registry;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ArmorMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.trim.ArmorTrim;
 import org.bukkit.inventory.meta.trim.TrimMaterial;
 import org.bukkit.inventory.meta.trim.TrimPattern;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -76,7 +79,43 @@ public class CosmeticsGUI {
         }
         gui.setItem(15, backItem);
 
+        // Add nether star showing total count
+        int totalCreated = dataManager.getPlayerCosmetics(player.getUniqueId()).size();
+        int maxAllowed = getMaxCosmetics(player);
+        
+        ItemStack limitItem = new ItemStack(Material.NETHER_STAR);
+        ItemMeta limitMeta = limitItem.getItemMeta();
+        limitMeta.setDisplayName("§6§lCosmetic Limit");
+        limitMeta.setLore(Arrays.asList(
+            "§7Created: §e" + totalCreated + "§7/§e" + maxAllowed,
+            "",
+            "§7You can create up to §e" + maxAllowed + "§7 cosmetics"
+        ));
+        limitItem.setItemMeta(limitMeta);
+        gui.setItem(26, limitItem); // Bottom right corner
+
         player.openInventory(gui);
+    }
+
+    private int getMaxCosmetics(Player player) {
+        if (player.hasPermission("customcosmetics.limit.bypass")) {
+            return Integer.MAX_VALUE;
+        }
+        
+        // Check for specific limit permissions
+        for (PermissionAttachmentInfo info : player.getEffectivePermissions()) {
+            String perm = info.getPermission();
+            if (perm.startsWith("customcosmetics.limit.")) {
+                try {
+                    String numStr = perm.substring("customcosmetics.limit.".length());
+                    if (!numStr.equals("bypass")) {
+                        return Integer.parseInt(numStr);
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        
+        return 5; // Default limit
     }
 
     public void openCosmeticsPage(Player player, CosmeticType type, int page) {
@@ -95,7 +134,7 @@ public class CosmeticsGUI {
 
         for (int i = startIndex; i < endIndex; i++) {
             Cosmetic cosmetic = cosmetics.get(i);
-            ItemStack item = getCosmeticItemStack(cosmetic);
+            ItemStack item = getCosmeticItemStack(cosmetic, player);
             gui.setItem(i - startIndex, item);
         }
 
@@ -133,6 +172,10 @@ public class CosmeticsGUI {
     }
 
     private ItemStack getCosmeticItemStack(Cosmetic cosmetic) {
+        return getCosmeticItemStack(cosmetic, null);
+    }
+
+    public ItemStack getCosmeticItemStack(Cosmetic cosmetic, Player player) {
         Material material;
         boolean addTrim = false;
 
@@ -154,13 +197,34 @@ public class CosmeticsGUI {
         ItemStack item = new ItemStack(material);
         ItemMeta metaBase = item.getItemMeta();
         if (metaBase != null) {
-            metaBase.setDisplayName("§e" + cosmetic.displayName());
-            metaBase.setLore(Arrays.asList(
-                    "§7Type: §f" + cosmetic.type().name(),
-                    "§7Blocks: §f" + cosmetic.blocks().size(),
-                    "",
-                    "§eClick to equip"
-            ));
+            // Check if cosmetic is equipped
+            boolean isEquipped = false;
+            if (player != null) {
+                isEquipped = plugin.getCosmeticManager().isEquipped(player, cosmetic.id());
+            }
+
+            metaBase.setDisplayName((isEquipped ? "§a" : "§e") + cosmetic.displayName());
+            
+            List<String> lore = new ArrayList<>();
+            lore.add("§7Type: §f" + cosmetic.type().name());
+            lore.add("§7Blocks: §f" + cosmetic.blocks().size());
+            lore.add("");
+            
+            if (isEquipped) {
+                lore.add("§a✓ Currently Equipped");
+                lore.add("");
+                lore.add("§eRight-Click to unequip");
+                lore.add("§cShift-Right-Click to delete");
+                
+                // Add enchantment glint
+                metaBase.addEnchant(Enchantment.UNBREAKING, 1, true);
+                metaBase.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            } else {
+                lore.add("§eLeft-Click to equip");
+                lore.add("§cShift-Right-Click to delete");
+            }
+            
+            metaBase.setLore(lore);
 
             if (addTrim && metaBase instanceof ArmorMeta) {
                 try {

@@ -1,6 +1,7 @@
 package net.mrbernie.customCosmetics.commands;
 
 import net.mrbernie.customCosmetics.CustomCosmetics;
+import net.mrbernie.customCosmetics.cosmetics.Cosmetic;
 import net.mrbernie.customCosmetics.cosmetics.CosmeticType;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -50,10 +51,16 @@ public class CosmeticsCommand implements CommandExecutor, TabCompleter {
                     handleAcceptCommand(player);
                     break;
                 case "inv":
+                    handleListCommand(player);
+                    break;
+                case "equip":
                     handleInvCommand(player);
                     break;
-                case "list":
-                    handleListCommand(player);
+                case "delete":
+                    handleDeleteCommand(player, args);
+                    break;
+                case "cleanup":
+                    handleCleanupCommand(player);
                     break;
                 case "reload":
                     handleReloadCommand(sender);
@@ -112,8 +119,8 @@ public class CosmeticsCommand implements CommandExecutor, TabCompleter {
 
     private void handleInvCommand(Player player) {
 
-        if (!player.hasPermission("customcosmetics.inv")) {
-            player.sendMessage(ChatColor.RED + "You do not have the right to use the cosmetics inventory.");
+        if (!player.hasPermission("customcosmetics.equip")) {
+            player.sendMessage(ChatColor.RED + "You do not have the right to equip cosmetics.");
             return;
         }
 
@@ -122,12 +129,68 @@ public class CosmeticsCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleListCommand(Player player) {
-        if (!player.hasPermission("customcosmetics.list")) {
+        if (!player.hasPermission("customcosmetics.inv")) {
             player.sendMessage(ChatColor.RED + "You do not have the right to view cosmetics.");
             return;
         }
 
         plugin.getCosmeticsGUI().openCategoryGUI(player);
+    }
+
+    private void handleDeleteCommand(Player player, String[] args) {
+        if (!player.hasPermission("customcosmetics.delete")) {
+            player.sendMessage(ChatColor.RED + "You do not have the right to delete cosmetics.");
+            return;
+        }
+
+        if (args.length < 2) {
+            player.sendMessage(ChatColor.RED + "Usage: /cc delete <cosmetic-name>");
+            return;
+        }
+
+        String cosmeticName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+        
+        // Find cosmetic by name
+        Cosmetic cosmetic = plugin.getDataManager().getPlayerCosmetics(player.getUniqueId())
+                .stream()
+                .filter(c -> c.displayName().equalsIgnoreCase(cosmeticName))
+                .findFirst()
+                .orElse(null);
+
+        if (cosmetic == null) {
+            player.sendMessage(ChatColor.RED + "Cosmetic '" + cosmeticName + "' not found!");
+            return;
+        }
+
+        plugin.getDataManager().deleteCosmetic(player.getUniqueId(), cosmetic.id());
+        plugin.getCosmeticManager().unequipCosmetic(player, cosmetic.id());
+        plugin.getCosmeticManager().loadCosmetics();
+        player.sendMessage(ChatColor.GREEN + "Deleted cosmetic: " + cosmeticName);
+    }
+
+    private void handleCleanupCommand(Player player) {
+        if (!player.hasPermission("customcosmetics.admin")) {
+            player.sendMessage(ChatColor.RED + "You do not have the right to use this command.");
+            return;
+        }
+
+        player.sendMessage(ChatColor.YELLOW + "Unequipping all cosmetics and scanning for invalid ones...");
+        
+        // First, unequip all cosmetics from the player
+        List<String> equippedIds = new ArrayList<>(plugin.getCosmeticManager().getEquippedCosmetics(player));
+        for (String id : equippedIds) {
+            plugin.getCosmeticManager().unequipCosmetic(player, id);
+        }
+        
+        // Then clean up invalid cosmetics
+        int cleaned = plugin.getDataManager().cleanupInvalidCosmetics(player.getUniqueId());
+        
+        if (cleaned > 0) {
+            plugin.getCosmeticManager().loadCosmetics();
+            player.sendMessage(ChatColor.GREEN + "Unequipped all cosmetics and cleaned up " + cleaned + " invalid cosmetic(s)!");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Unequipped all cosmetics. No invalid cosmetics found!");
+        }
     }
 
     private void handleReloadCommand(CommandSender sender) {
@@ -184,11 +247,13 @@ public class CosmeticsCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(ChatColor.GOLD + "--- Commands CustomCosmetics ---");
         player.sendMessage(ChatColor.YELLOW + "/cc create <Name> <Type> - Start making cosmetics.");
         player.sendMessage(ChatColor.YELLOW + "/cc accept - Complete the creation and save the cosmetics.");
-        player.sendMessage(ChatColor.YELLOW + "/cc inv - Open the inventory with cosmetics.");
-        player.sendMessage(ChatColor.YELLOW + "/cc list - Browse all your cosmetics by category.");
+        player.sendMessage(ChatColor.YELLOW + "/cc inv - Browse all your cosmetics by category.");
+        player.sendMessage(ChatColor.YELLOW + "/cc equip - Open the equipment inventory.");
+        player.sendMessage(ChatColor.YELLOW + "/cc delete <Name> - Delete a cosmetic.");
         player.sendMessage(ChatColor.YELLOW + "/cc toggle self - Toggle seeing your own cosmetics.");
         player.sendMessage(ChatColor.YELLOW + "/cc toggle others - Toggle seeing other players' cosmetics.");
         if (player.hasPermission("customcosmetics.admin")) {
+            player.sendMessage(ChatColor.RED + "/cc cleanup - Remove invalid/empty cosmetics.");
             player.sendMessage(ChatColor.RED + "/cc reload - Restart the cosmetics configuration.");
         }
     }
@@ -203,11 +268,15 @@ public class CosmeticsCommand implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("customcosmetics.inv")) {
                 completions.add("inv");
             }
-            if (sender.hasPermission("customcosmetics.list")) {
-                completions.add("list");
+            if (sender.hasPermission("customcosmetics.equip")) {
+                completions.add("equip");
+            }
+            if (sender.hasPermission("customcosmetics.delete")) {
+                completions.add("delete");
             }
             completions.add("toggle");
             if (sender.hasPermission("customcosmetics.admin")) {
+                completions.add("cleanup");
                 completions.add("reload");
             }
             return completions.stream()

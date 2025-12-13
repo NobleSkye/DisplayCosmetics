@@ -82,7 +82,10 @@ public class CreationManager {
         creationSessions.put(player.getUniqueId(), session);
 
         player.setGameMode(GameMode.CREATIVE);
-        player.teleport(buildAreaCorner.clone().add(8, 0.5, 8));
+        Location spawnLoc = buildAreaCorner.clone().add(8, 0.5, 8);
+        spawnLoc.setYaw(180); // Face north
+        spawnLoc.setPitch(0); // Look straight ahead
+        player.teleport(spawnLoc);
         player.sendMessage(ChatColor.GREEN + "You have entered the creation mode. Build your item within the platform (16x16x16).");
         player.sendMessage(ChatColor.YELLOW + "When you're done, write /cc accept");
     }
