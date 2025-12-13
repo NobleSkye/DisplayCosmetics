@@ -1,0 +1,58 @@
+name: CustomCosmetics
+version: 1.1.0
+main: net.mrbernie.customCosmetics.CustomCosmetics
+api-version: '1.21.4'
+authors: [MrBernie6873, NobleSkye]
+description: Create and wear your own custom block cosmetics!
+softdepend: [ProtocolLib]
+commands:
+  cc:
+    description: Main command for CustomCosmetics plugin.
+    usage: /cc <create|accept|inv|list|reload|toggle>
+    aliases: [cosmetics, cosmetic]
+permissions:
+  customcosmetics.*:
+    description: Grants all CustomCosmetics permissions.
+    default: op
+    children:
+      customcosmetics.create: true
+      customcosmetics.inv: true
+      customcosmetics.list: true
+      customcosmetics.admin: true
+      customcosmetics.limit.bypass: true
+  customcosmetics.create:
+    description: Allows a player to create their own cosmetics.
+    default: true
+  customcosmetics.inv:
+    description: Allows a player to open the cosmetic inventory and wear items.
+    default: true
+  customcosmetics.list:
+    description: Allows a player to browse their cosmetics by category.
+    default: true
+  customcosmetics.admin:
+    description: Gives access to administrative commands for the plugin.
+    default: op
+  customcosmetics.limit.bypass:
+    description: Unlimited cosmetics. Bypasses all limits.
+    default: false
+  customcosmetics.limit.1:
+    description: Allows creating up to 1 cosmetic.
+    default: false
+  customcosmetics.limit.3:
+    description: Allows creating up to 3 cosmetics (default for users without specific limit).
+    default: true
+  customcosmetics.limit.5:
+    description: Allows creating up to 5 cosmetics.
+    default: false
+  customcosmetics.limit.10:
+    description: Allows creating up to 10 cosmetics.
+    default: false
+  customcosmetics.limit.25:
+    description: Allows creating up to 25 cosmetics.
+    default: false
+  customcosmetics.limit.50:
+    description: Allows creating up to 50 cosmetics.
+    default: false
+  customcosmetics.limit.100:
+    description: Allows creating up to 100 cosmetics.
+    default: false
