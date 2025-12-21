@@ -42,3 +42,8 @@ A Minecraft plugin that lets players create and display custom block cosmetics o
 2. Place the JAR file in your server's `plugins` folder
 3. Restart your server
 4. (Optional) Install [ProtocolLib](https://www.spigotmc.org/resources/protocollib.1997/) for best performance
+
+## License
+
+- Original CustomCosmetics code by Имранали remains under the MIT License (see [LICENSE](LICENSE)).
+- Display Cosmetics updates and additions are provided under the GNU LGPL-3.0-or-later (see [LICENSE-LGPL-3.0.txt](LICENSE-LGPL-3.0.txt)).
