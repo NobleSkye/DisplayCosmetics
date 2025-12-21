@@ -175,19 +175,30 @@ public class PacketCosmeticDisplay {
     private void sendTeleportPacket(Player viewer, int entityId, Location loc) {
         try {
             PacketContainer teleportPacket = ProtocolLibrary.getProtocolManager().createPacket(PacketType.Play.Server.ENTITY_TELEPORT);
-            teleportPacket.getIntegers().write(0, entityId);
+            
+            // Set entity ID using modifier
+            teleportPacket.getModifier().write(0, entityId);
+            
+            // Set position (X, Y, Z)
             teleportPacket.getDoubles()
                 .write(0, loc.getX())
                 .write(1, loc.getY())
                 .write(2, loc.getZ());
+            
+            // Yaw and pitch (convert to byte representation: degrees * 256 / 360)
+            byte yaw = (byte) ((loc.getYaw() * 256.0F) / 360.0F);
+            byte pitch = (byte) ((loc.getPitch() * 256.0F) / 360.0F);
             teleportPacket.getBytes()
-                .write(0, (byte) 0) // Yaw
-                .write(1, (byte) 0); // Pitch
-            teleportPacket.getBooleans().write(0, false); // On ground
+                .write(0, yaw)
+                .write(1, pitch);
+            
+            // On ground flag
+            teleportPacket.getBooleans().write(0, true);
             
             ProtocolLibrary.getProtocolManager().sendServerPacket(viewer, teleportPacket);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to send teleport packet: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -290,7 +301,9 @@ public class PacketCosmeticDisplay {
         if (cosmetic.type() == CosmeticType.HEAD) {
             loc = owner.getEyeLocation().clone();
         } else {
+            // For BACK and SHOULDER, use body location with body yaw
             loc = owner.getLocation().clone();
+            loc.setYaw(owner.getBodyYaw()); // Use actual body yaw instead of head yaw
         }
         
         loc.setPitch(0); // Remove pitch so cosmetics don't tilt

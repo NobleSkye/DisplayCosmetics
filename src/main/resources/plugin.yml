@@ -1,9 +1,9 @@
-name: CustomCosmetics
+name: DisplayCosmetics
 version: 1.1.0
 main: net.mrbernie.customCosmetics.CustomCosmetics
 api-version: '1.21.8'
 authors: [MrBernie6873, NobleSkye]
-description: Create and wear your own custom block cosmetics!
+description: Display and wear your own custom block cosmetics!
 softdepend: [ProtocolLib]
 commands:
   cc:

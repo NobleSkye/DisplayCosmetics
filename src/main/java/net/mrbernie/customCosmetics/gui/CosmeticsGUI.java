@@ -26,75 +26,105 @@ public class CosmeticsGUI {
 
     private final CustomCosmetics plugin;
     private final DataManager dataManager;
-    private static final int PAGE_SIZE = 45; // 5 rows of 9 slots
+    private static final int COSMETICS_PER_PAGE = 27; // 3 rows of 9 slots
 
     public CosmeticsGUI(CustomCosmetics plugin) {
         this.plugin = plugin;
         this.dataManager = plugin.getDataManager();
     }
 
-    public void openCategoryGUI(Player player) {
-        Inventory gui = Bukkit.createInventory(null, 27, "§6§lCosmetics Categories");
-
-        // HEAD category
-        ItemStack headItem = new ItemStack(Material.IRON_HELMET);
-        ItemMeta headMeta = headItem.getItemMeta();
-        headMeta.setDisplayName("§e§lHEAD Cosmetics");
-        List<Cosmetic> headCosmetics = getPlayerCosmeticsByType(player.getUniqueId(), CosmeticType.HEAD);
-        headMeta.setLore(Arrays.asList("§7Click to view", "§7Total: §e" + headCosmetics.size()));
-        headItem.setItemMeta(headMeta);
-        gui.setItem(11, headItem);
-
-        // SHOULDER category
-        ItemStack shoulderItem = new ItemStack(Material.IRON_CHESTPLATE);
-        ItemMeta shoulderMeta = shoulderItem.getItemMeta();
-        shoulderMeta.setDisplayName("§e§lSHOULDER Cosmetics");
-        List<Cosmetic> shoulderCosmetics = getPlayerCosmeticsByType(player.getUniqueId(), CosmeticType.SHOULDER);
-        shoulderMeta.setLore(Arrays.asList("§7Click to view", "§7Total: §e" + shoulderCosmetics.size()));
-        shoulderItem.setItemMeta(shoulderMeta);
-        gui.setItem(13, shoulderItem);
-
-        // BACK category
-        ItemStack backItem = new ItemStack(Material.IRON_CHESTPLATE);
-        ItemMeta backMetaBase = backItem.getItemMeta();
-        if (backMetaBase instanceof ArmorMeta) {
-            ArmorMeta backMeta = (ArmorMeta) backMetaBase;
-            backMeta.setDisplayName("§e§lBACK Cosmetics");
-            List<Cosmetic> backCosmetics = getPlayerCosmeticsByType(player.getUniqueId(), CosmeticType.BACK);
-            backMeta.setLore(Arrays.asList("§7Click to view", "§7Total: §e" + backCosmetics.size()));
-            
-            // Add purple armor trim
-            try {
-                TrimMaterial trimMaterial = Registry.TRIM_MATERIAL.get(org.bukkit.NamespacedKey.minecraft("amethyst"));
-                TrimPattern trimPattern = Registry.TRIM_PATTERN.get(org.bukkit.NamespacedKey.minecraft("coast"));
-                if (trimMaterial != null && trimPattern != null) {
-                    ArmorTrim trim = new ArmorTrim(trimMaterial, trimPattern);
-                    backMeta.setTrim(trim);
-                }
-            } catch (Exception e) {
-                plugin.getLogger().warning("Failed to add armor trim to BACK cosmetic icon");
-            }
-            
-            backItem.setItemMeta(backMeta);
+    /**
+     * Opens the cosmetics inventory showing all player's cosmetics with pagination
+     * @param player The player to show the GUI to
+     * @param page The page number (0-indexed)
+     */
+    public void openCosmeticsInventory(Player player, int page) {
+        List<Cosmetic> allCosmetics = dataManager.getPlayerCosmetics(player.getUniqueId());
+        
+        // Calculate pagination
+        int totalPages = Math.max(1, (int) Math.ceil((double) allCosmetics.size() / COSMETICS_PER_PAGE));
+        page = Math.max(0, Math.min(page, totalPages - 1));
+        
+        int startIndex = page * COSMETICS_PER_PAGE;
+        int endIndex = Math.min(startIndex + COSMETICS_PER_PAGE, allCosmetics.size());
+        
+        // Create 4-row inventory
+        String title = "§6§lCosmetics §7(Page " + (page + 1) + "/" + totalPages + ")";
+        Inventory gui = Bukkit.createInventory(null, 36, title);
+        
+        // Add cosmetics to first 3 rows (slots 0-26)
+        for (int i = startIndex; i < endIndex; i++) {
+            Cosmetic cosmetic = allCosmetics.get(i);
+            ItemStack item = getCosmeticItemStack(cosmetic, player);
+            gui.setItem(i - startIndex, item);
         }
-        gui.setItem(15, backItem);
-
-        // Add nether star showing total count
-        int totalCreated = dataManager.getPlayerCosmetics(player.getUniqueId()).size();
+        
+        // Bottom row (row 4): Gray stained glass panes with navigation
+        ItemStack grayGlass = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        ItemMeta glassMeta = grayGlass.getItemMeta();
+        glassMeta.setDisplayName(" ");
+        grayGlass.setItemMeta(glassMeta);
+        
+        // Fill bottom row with gray glass
+        for (int i = 27; i < 36; i++) {
+            gui.setItem(i, grayGlass.clone());
+        }
+        
+        // Previous page arrow (slot 27 - bottom left)
+        if (page > 0) {
+            ItemStack prevArrow = new ItemStack(Material.ARROW);
+            ItemMeta prevMeta = prevArrow.getItemMeta();
+            prevMeta.setDisplayName("§e◀ Previous Page");
+            prevMeta.setLore(Arrays.asList("§7Page " + page + "/" + totalPages));
+            prevArrow.setItemMeta(prevMeta);
+            gui.setItem(27, prevArrow);
+        }
+        
+        // Info item (slot 31 - bottom center)
+        int totalCreated = allCosmetics.size();
         int maxAllowed = getMaxCosmetics(player);
         
-        ItemStack limitItem = new ItemStack(Material.NETHER_STAR);
-        ItemMeta limitMeta = limitItem.getItemMeta();
-        limitMeta.setDisplayName("§6§lCosmetic Limit");
-        limitMeta.setLore(Arrays.asList(
-            "§7Created: §e" + totalCreated + "§7/§e" + maxAllowed,
+        ItemStack infoItem = new ItemStack(Material.NETHER_STAR);
+        ItemMeta infoMeta = infoItem.getItemMeta();
+        infoMeta.setDisplayName("§6§lYour Cosmetics");
+        infoMeta.setLore(Arrays.asList(
+            "§7Total: §e" + totalCreated + "§7/§e" + maxAllowed,
             "",
-            "§7You can create up to §e" + maxAllowed + "§7 cosmetics"
+            "§7§oLeft-Click to equip",
+            "§7§oRight-Click to unequip",
+            "§7§oShift-Right-Click to delete"
         ));
-        limitItem.setItemMeta(limitMeta);
-        gui.setItem(26, limitItem); // Bottom right corner
-
+        infoItem.setItemMeta(infoMeta);
+        gui.setItem(31, infoItem);
+        
+        // Next page arrow (slot 35 - bottom right)
+        if (page < totalPages - 1) {
+            ItemStack nextArrow = new ItemStack(Material.ARROW);
+            ItemMeta nextMeta = nextArrow.getItemMeta();
+            nextMeta.setDisplayName("§eNext Page ▶");
+            nextMeta.setLore(Arrays.asList("§7Page " + (page + 2) + "/" + totalPages));
+            nextArrow.setItemMeta(nextMeta);
+            gui.setItem(35, nextArrow);
+        }
+        
         player.openInventory(gui);
+    }
+
+    /**
+     * Opens the first page of cosmetics
+     */
+    public void openCosmeticsInventory(Player player) {
+        openCosmeticsInventory(player, 0);
+    }
+
+    // Legacy method for backwards compatibility - redirects to new inventory
+    public void openCategoryGUI(Player player) {
+        openCosmeticsInventory(player, 0);
+    }
+
+    // Legacy method for backwards compatibility - redirects to new inventory
+    public void openCosmeticsPage(Player player, CosmeticType type, int page) {
+        openCosmeticsInventory(player, page);
     }
 
     private int getMaxCosmetics(Player player) {
@@ -116,53 +146,6 @@ public class CosmeticsGUI {
         }
         
         return 5; // Default limit
-    }
-
-    public void openCosmeticsPage(Player player, CosmeticType type, int page) {
-        List<Cosmetic> cosmetics = getPlayerCosmeticsByType(player.getUniqueId(), type);
-        int maxPage = Math.max(0, (cosmetics.size() - 1) / PAGE_SIZE);
-
-        if (page > maxPage) page = maxPage;
-        if (page < 0) page = 0;
-
-        String title = "§6§l" + type.name() + " Cosmetics §8(Page " + (page + 1) + "/" + (maxPage + 1) + ")";
-        Inventory gui = Bukkit.createInventory(null, 54, title);
-
-        // Add cosmetics to page
-        int startIndex = page * PAGE_SIZE;
-        int endIndex = Math.min(startIndex + PAGE_SIZE, cosmetics.size());
-
-        for (int i = startIndex; i < endIndex; i++) {
-            Cosmetic cosmetic = cosmetics.get(i);
-            ItemStack item = getCosmeticItemStack(cosmetic, player);
-            gui.setItem(i - startIndex, item);
-        }
-
-        // Navigation buttons
-        if (page > 0) {
-            ItemStack prevButton = new ItemStack(Material.ARROW);
-            ItemMeta prevMeta = prevButton.getItemMeta();
-            prevMeta.setDisplayName("§e← Previous Page");
-            prevButton.setItemMeta(prevMeta);
-            gui.setItem(48, prevButton);
-        }
-
-        if (page < maxPage) {
-            ItemStack nextButton = new ItemStack(Material.ARROW);
-            ItemMeta nextMeta = nextButton.getItemMeta();
-            nextMeta.setDisplayName("§eNext Page →");
-            nextButton.setItemMeta(nextMeta);
-            gui.setItem(50, nextButton);
-        }
-
-        // Back button
-        ItemStack backButton = new ItemStack(Material.BARRIER);
-        ItemMeta backMeta = backButton.getItemMeta();
-        backMeta.setDisplayName("§c← Back to Categories");
-        backButton.setItemMeta(backMeta);
-        gui.setItem(49, backButton);
-
-        player.openInventory(gui);
     }
 
     private List<Cosmetic> getPlayerCosmeticsByType(UUID playerUUID, CosmeticType type) {

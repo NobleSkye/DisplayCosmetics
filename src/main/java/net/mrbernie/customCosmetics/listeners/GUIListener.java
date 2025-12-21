@@ -3,13 +3,11 @@ package net.mrbernie.customCosmetics.listeners;
 import net.mrbernie.customCosmetics.CustomCosmetics;
 import net.mrbernie.customCosmetics.commands.CosmeticsCommand;
 import net.mrbernie.customCosmetics.cosmetics.Cosmetic;
-import net.mrbernie.customCosmetics.cosmetics.CosmeticType;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -21,7 +19,6 @@ import java.util.UUID;
 public class GUIListener implements Listener {
 
     private final CustomCosmetics plugin;
-    private final Map<UUID, CosmeticType> viewingType = new HashMap<>();
     private final Map<UUID, Integer> currentPage = new HashMap<>();
 
     public GUIListener(CustomCosmetics plugin) {
@@ -33,8 +30,8 @@ public class GUIListener implements Listener {
         String title = event.getView().getTitle();
         Player player = (Player) event.getWhoClicked();
         
-        // Handle cosmetics categories GUI
-        if (title.equals("§6§lCosmetics Categories")) {
+        // Handle new cosmetics GUI with pagination
+        if (title.contains("§6§lCosmetics") && title.contains("Page")) {
             event.setCancelled(true);
             ItemStack clickedItem = event.getCurrentItem();
             if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
@@ -42,55 +39,26 @@ public class GUIListener implements Listener {
             String displayName = clickedItem.getItemMeta() != null ? 
                     ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName()) : "";
 
-            CosmeticType type = null;
-            if (displayName.contains("HEAD")) {
-                type = CosmeticType.HEAD;
-            } else if (displayName.contains("SHOULDER")) {
-                type = CosmeticType.SHOULDER;
-            } else if (displayName.contains("BACK")) {
-                type = CosmeticType.BACK;
-            }
-
-            if (type != null) {
-                viewingType.put(player.getUniqueId(), type);
-                currentPage.put(player.getUniqueId(), 0);
-                plugin.getCosmeticsGUI().openCosmeticsPage(player, type, 0);
-            }
-            return;
-        }
-
-        // Handle cosmetics page GUI
-        if (title.contains("Cosmetics") && title.contains("Page")) {
-            event.setCancelled(true);
-            ItemStack clickedItem = event.getCurrentItem();
-            if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
-
-            String displayName = clickedItem.getItemMeta() != null ? 
-                    ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName()) : "";
-
-            // Navigation buttons
+            // Check for navigation buttons
             if (displayName.contains("Previous Page")) {
                 int page = currentPage.getOrDefault(player.getUniqueId(), 0);
-                CosmeticType type = viewingType.get(player.getUniqueId());
-                if (type != null && page > 0) {
+                if (page > 0) {
                     currentPage.put(player.getUniqueId(), page - 1);
-                    plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page - 1);
+                    plugin.getCosmeticsGUI().openCosmeticsInventory(player, page - 1);
                 }
                 return;
             } else if (displayName.contains("Next Page")) {
                 int page = currentPage.getOrDefault(player.getUniqueId(), 0);
-                CosmeticType type = viewingType.get(player.getUniqueId());
-                if (type != null) {
-                    currentPage.put(player.getUniqueId(), page + 1);
-                    plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page + 1);
-                }
+                currentPage.put(player.getUniqueId(), page + 1);
+                plugin.getCosmeticsGUI().openCosmeticsInventory(player, page + 1);
                 return;
-            } else if (displayName.contains("Back to Categories")) {
-                plugin.getCosmeticsGUI().openCategoryGUI(player);
+            } else if (clickedItem.getType() == Material.GRAY_STAINED_GLASS_PANE || 
+                       clickedItem.getType() == Material.NETHER_STAR) {
+                // Clicked on glass pane or info item - ignore
                 return;
             }
 
-            // Cosmetic item clicked - equip or delete
+            // Cosmetic item clicked - check if it's a helmet or chestplate
             if (clickedItem.getType() == Material.IRON_HELMET || 
                 clickedItem.getType() == Material.IRON_CHESTPLATE) {
                 
@@ -114,9 +82,8 @@ public class GUIListener implements Listener {
                         player.sendMessage(ChatColor.RED + "Deleted cosmetic: " + cosmeticName);
                         
                         // Refresh the page
-                        CosmeticType type = viewingType.get(player.getUniqueId());
                         int page = currentPage.getOrDefault(player.getUniqueId(), 0);
-                        plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page);
+                        plugin.getCosmeticsGUI().openCosmeticsInventory(player, page);
                     } else if (event.isRightClick()) {
                         // Right-click to unequip (if equipped)
                         if (plugin.getCosmeticManager().isEquipped(player, cosmetic.id())) {
@@ -124,9 +91,8 @@ public class GUIListener implements Listener {
                             player.sendMessage(ChatColor.YELLOW + "Unequipped " + cosmeticName + "!");
                             
                             // Refresh the page
-                            CosmeticType type = viewingType.get(player.getUniqueId());
                             int page = currentPage.getOrDefault(player.getUniqueId(), 0);
-                            plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page);
+                            plugin.getCosmeticsGUI().openCosmeticsInventory(player, page);
                         } else {
                             player.sendMessage(ChatColor.RED + "This cosmetic is not equipped!");
                         }
@@ -136,9 +102,8 @@ public class GUIListener implements Listener {
                             player.sendMessage(ChatColor.GREEN + "Equipped " + cosmeticName + "!");
                             
                             // Refresh the page
-                            CosmeticType type = viewingType.get(player.getUniqueId());
                             int page = currentPage.getOrDefault(player.getUniqueId(), 0);
-                            plugin.getCosmeticsGUI().openCosmeticsPage(player, type, page);
+                            plugin.getCosmeticsGUI().openCosmeticsInventory(player, page);
                         }
                     }
                 }
