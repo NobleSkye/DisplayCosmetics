@@ -33,7 +33,7 @@ A Minecraft plugin that lets players create and display custom block cosmetics o
 
 ## Requirements
 
-- Minecraft 1.21.8 (Paper/Spigot)
+- Minecraft 1.21.11 (Paper/Spigot)
 - ProtocolLib (optional, recommended)
 
 ## Installation
