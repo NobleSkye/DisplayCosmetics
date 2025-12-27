@@ -1,7 +1,7 @@
 name: DisplayCosmetics
-version: 1.1.0
+version: 1.1.1
 main: net.mrbernie.customCosmetics.CustomCosmetics
-api-version: '1.21.8'
+api-version: '1.21.10'
 modrinth-project-id: "SgEwdkmG"
 authors: [MrBernie6873, NobleSkye]
 description: Display and wear your own custom block cosmetics!
